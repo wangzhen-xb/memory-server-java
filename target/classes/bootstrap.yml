@@ -1,0 +1,38 @@
+# bootstrap 阶段配置：Nacos 必须在主上下文之前接入，故单独成文件
+# local 档整体关闭 Nacos（本机未装也能起服务），cloud 档开启并从配置中心拉业务参数
+spring:
+  profiles:
+    # bootstrap 上下文只认这里，必须显式透传
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  cloud:
+    nacos:
+      config:
+        server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        group: DEFAULT_GROUP
+        file-extension: yaml
+        # 拉取失败不阻断启动，回落本地 application.yml
+        max-retry: 3
+        config-retry-time: 2000
+        config-long-poll-timeout: 4000
+        refresh-enabled: true
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  cloud:
+    nacos:
+      config:
+        enabled: false
+
+---
+spring:
+  config:
+    activate:
+      on-profile: cloud
+  cloud:
+    nacos:
+      config:
+        enabled: true

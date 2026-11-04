@@ -1,0 +1,6 @@
+com\jiryi\memoryserver\config\MemoryPropertiesBindingTest$TestConfig.class
+com\jiryi\memoryserver\service\PasswordEncoderTest.class
+com\jiryi\memoryserver\service\ConversationServiceTest.class
+com\jiryi\memoryserver\web\BodyLimitFilterTest.class
+com\jiryi\memoryserver\config\MemoryPropertiesBindingTest.class
+com\jiryi\memoryserver\web\SentinelGuardTest.class

@@ -1,0 +1,157 @@
+server:
+  port: ${PORT:8787}
+  # 优雅停机：停止接收新请求后等在途请求跑完再关容器，避免会话写入/同步被中断
+  shutdown: graceful
+  # 会话同步含图片 base64，需放宽 Tomcat 的请求体吞掉限制；默认 2MB 会直接截断
+  tomcat:
+    max-swallow-size: -1
+    connection-timeout: 60000
+  # 显式设定 HTTP 表单/请求头大小，业务侧另有按接口的分级校验
+  max-http-header-size: 16KB
+
+spring:
+  application:
+    name: memory-server
+  # 优雅停机单阶段最长等待
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  main:
+    banner-mode: "off"
+  profiles:
+    # 本地无 Nacos 时用 local；部署环境 -Dspring.profiles.active=cloud
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    # SQL 执行超时（秒）：避免异常慢查询长期占用连接池，拖垮整个服务
+    default-statement-timeout: 10
+    # 生产禁用 SQL 打印：payload 可达数 MB，绝不能整体落日志
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# 业务参数：全部外置，禁止硬编码（键名与 MemoryProperties 字段一一对应，写错键会静默走默认值）
+memory:
+  session-ttl: 30d
+  memory-max-count: 30
+  memory-max-length: 200
+  title-max-length: 80
+  username-max-length: 64
+  password-min-length: 6
+  password-max-length: 128
+  nickname-max-length: 64
+  # 请求体分级上限（字节）：默认 64KB，会话同步 64MB
+  default-body-bytes: 65536
+  conversation-body-bytes: 67108864
+  # 单条会话 payload 上限（字节）：防止个别超大会话挤爆整批同步
+  conversation-payload-max-bytes: 8388608
+  # 会话分页单页上限，客户端传更大值会被收敛
+  list-page-max: 500
+  # 跨域白名单：本地开发保持 * ；部署时改为具体前端域名（如 https://chat.example.com）
+  cors:
+    allowed-origin-patterns:
+      - "*"
+  # 登录失败锁定：连续 5 次锁 15 分钟
+  login-fail-max: 5
+  login-fail-lock: 15m
+  # 是否信任 nginx 注入的 X-Forwarded-For 类头：位于可信代理后置 true（当前部署形态）；
+  # 应用直接对外必须置 false，否则每请求伪造一个 IP 就能绕开按 IP 登录限流
+  trust-proxy: ${MEMORY_TRUST_PROXY:true}
+  # scrypt 参数与 Node crypto.scryptSync 默认值严格对齐，否则存量密码校验失败
+  scrypt:
+    n: 16384
+    r: 8
+    p: 1
+    dk-len: 64
+    salt-bytes: 16
+  # 限流规则来源：local=读 classpath 内置 JSON；nacos=由 SCA datasource 托管（见 cloud 档）
+  sentinel:
+    rule-source: ${MEMORY_SENTINEL_SOURCE:local}
+
+# Redis 键前缀，多环境共用实例时靠它隔离
+redis:
+  key:
+    session-prefix: "mem:sess:"
+    login-fail-prefix: "mem:fail:"
+    login-lock-prefix: "mem:lock:"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    root: info
+    com.jiryi.memoryserver: info
+
+---
+# ==================== 本地档：不依赖 Nacos ====================
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: jdbc:postgresql://${PG_HOST:127.0.0.1}:${PG_PORT:5432}/${PG_DB:memory_db}
+    username: ${PG_USER:memory}
+    password: ${PG_PASSWORD:memory}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 10000
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DB:0}
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+
+---
+# ==================== 云端档：Nacos 配置中心 + Sentinel 规则持久化 ====================
+spring:
+  config:
+    activate:
+      on-profile: cloud
+  cloud:
+    sentinel:
+      transport:
+        dashboard: ${SENTINEL_DASHBOARD:127.0.0.1:8858}
+        port: 8719
+      eager: true
+      # 规则由 Nacos 托管，Dashboard 改动需同步回 Nacos 才生效
+      datasource:
+        flow:
+          nacos:
+            server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+            namespace: ${NACOS_NAMESPACE:}
+            group-id: SENTINEL_GROUP
+            data-id: memory-server-flow-rules
+            rule-type: flow
+        param:
+          nacos:
+            server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+            namespace: ${NACOS_NAMESPACE:}
+            group-id: SENTINEL_GROUP
+            data-id: memory-server-param-rules
+            rule-type: param_flow
+
+memory:
+  sentinel:
+    rule-source: nacos

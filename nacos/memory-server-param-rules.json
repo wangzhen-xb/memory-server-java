@@ -1,0 +1,42 @@
+[
+  {
+    "resource": "ip:auth",
+    "paramIdx": 0,
+    "grade": 1,
+    "count": 5,
+    "durationInSec": 1,
+    "controlBehavior": 0,
+    "maxQueueingTimeMs": 0,
+    "paramFlowItemList": []
+  },
+  {
+    "resource": "userId:api",
+    "paramIdx": 0,
+    "grade": 1,
+    "count": 50,
+    "durationInSec": 1,
+    "controlBehavior": 0,
+    "maxQueueingTimeMs": 0,
+    "paramFlowItemList": []
+  },
+  {
+    "resource": "userId:memory-replace",
+    "paramIdx": 0,
+    "grade": 1,
+    "count": 10,
+    "durationInSec": 1,
+    "controlBehavior": 0,
+    "maxQueueingTimeMs": 0,
+    "paramFlowItemList": []
+  },
+  {
+    "resource": "userId:conversation-sync",
+    "paramIdx": 0,
+    "grade": 1,
+    "count": 5,
+    "durationInSec": 1,
+    "controlBehavior": 0,
+    "maxQueueingTimeMs": 0,
+    "paramFlowItemList": []
+  }
+]

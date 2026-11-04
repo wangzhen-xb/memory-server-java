@@ -1,0 +1,50 @@
+# =====================================================================
+# Nacos 配置中心种子文件（仅 cloud 档使用）
+# 导入位置：Nacos 控制台 → 配置管理 → 新建配置
+#   dataId       = memory-server.yaml
+#   group        = DEFAULT_GROUP
+#   所属命名空间  = 与 NACOS_NAMESPACE 一致（默认 public）
+#   配置格式      = YAML
+# 说明：cloud 档启动时，bootstrap 会拉取本配置覆盖本地 application.yml
+#      的同名键；此处只需写"需要随环境变化的业务参数"，数据源/Redis 连接
+#      仍由各环境的启动参数或环境变量注入，不落在这份共享配置里。
+# =====================================================================
+
+memory:
+  # 会话有效期
+  session-ttl: 30d
+  # 单用户长期记忆保留条数与单条字数上限
+  memory-max-count: 30
+  memory-max-length: 200
+  # 会话标题上限
+  title-max-length: 80
+  # 账号字段长度
+  username-max-length: 64
+  password-min-length: 6
+  password-max-length: 128
+  nickname-max-length: 64
+  # 请求体分级上限（字节）：默认 64KB，会话同步 64MB
+  default-body-bytes: 65536
+  conversation-body-bytes: 67108864
+  # 登录失败锁定：连续 5 次锁 15 分钟
+  login-fail-max: 5
+  login-fail-lock: 15m
+  # 部署形态相关：位于可信 nginx 之后保持 true，应用直接对外改 false
+  trust-proxy: ${MEMORY_TRUST_PROXY:true}
+  # scrypt 参数必须与 Node crypto.scryptSync 默认值严格对齐，改动会导致存量密码无法校验
+  scrypt:
+    n: 16384
+    r: 8
+    p: 1
+    dk-len: 64
+    salt-bytes: 16
+  sentinel:
+    # cloud 档由 Nacos datasource 托管限流规则
+    rule-source: nacos
+
+# Redis 键前缀（多环境共用实例时靠它隔离，一般无需改）
+redis:
+  key:
+    session-prefix: "mem:sess:"
+    login-fail-prefix: "mem:fail:"
+    login-lock-prefix: "mem:lock:"

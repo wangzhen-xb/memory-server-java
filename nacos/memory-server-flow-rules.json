@@ -1,0 +1,26 @@
+[
+  {
+    "resource": "auth-api",
+    "limitApp": "default",
+    "grade": 1,
+    "count": 10,
+    "strategy": 0,
+    "controlBehavior": 0
+  },
+  {
+    "resource": "memory-api",
+    "limitApp": "default",
+    "grade": 1,
+    "count": 200,
+    "strategy": 0,
+    "controlBehavior": 0
+  },
+  {
+    "resource": "conversation-sync",
+    "limitApp": "default",
+    "grade": 1,
+    "count": 10,
+    "strategy": 0,
+    "controlBehavior": 0
+  }
+]

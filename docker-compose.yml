@@ -1,0 +1,74 @@
+# 本地中间件一键起：PostgreSQL + Redis + Nacos + Sentinel Dashboard
+# 用法：docker compose up -d   （首次拉镜像约 2GB；本机当前未装 Docker，需在装有 Docker Desktop 的环境执行）
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: memory-postgres
+    environment:
+      POSTGRES_DB: memory_db
+      POSTGRES_USER: memory
+      POSTGRES_PASSWORD: memory
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      # 首次初始化自动执行建表脚本
+      - ./sql/01-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U memory -d memory_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: memory-redis
+    # 会话不可丢：开 AOF 落盘；到达内存上限时拒绝新写入(noevaporation)而非淘汰存活会话。
+    # 用 allkeys-lru 会形成“驱逐会话→鉴权回落 DB→回填又驱逐另一会话”的持续抖动，
+    # 把流量全部压到 PG；noevaporation 下写失败由 RedisSessionStore 吞并降级，
+    # t_session 仍是完整留痕，不影响正确性（详见 RedisSessionStore 类注释）
+    command: >
+      redis-server --appendonly yes --maxmemory 256mb
+      --maxmemory-policy noevaporation
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  nacos:
+    image: nacos/nacos-server:v2.3.2
+    container_name: memory-nacos
+    environment:
+      MODE: standalone
+      # v2.3+ 默认开启鉴权，密钥必须由 .env 注入，禁止写死在compose里
+      NACOS_AUTH_ENABLE: "true"
+      NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN}
+      NACOS_AUTH_IDENTITY_KEY: ${NACOS_AUTH_IDENTITY_KEY}
+      NACOS_AUTH_IDENTITY_VALUE: ${NACOS_AUTH_IDENTITY_VALUE}
+      JVM_XMS: 512m
+      JVM_XMX: 512m
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8848/nacos/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  sentinel-dashboard:
+    image: bladex/sentinel-dashboard:1.8.6
+    container_name: memory-sentinel
+    environment:
+      # 控制台登录账号，生产必须改
+      AUTH_USERNAME: ${SENTINEL_USER:-sentinel}
+      AUTH_PASSWORD: ${SENTINEL_PASSWORD}
+    ports:
+      - "8858:8858"
+
+volumes:
+  pg-data:
+  redis-data:
